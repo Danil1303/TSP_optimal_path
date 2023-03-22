@@ -9,18 +9,18 @@ from PyQt5.QtWidgets import QApplication, QPushButton, QLabel, QLineEdit, QWidge
 
 
 class MainWindow(QWidget):
-    window_width = 920
-    window_height = 500
+    window_width = 1920
+    window_height = 1000
 
     def __init__(self):
-        super(MainWindow, self).__init__()
-        super().__init__()
+        QWidget.__init__(self)
+        # super(MainWindow, self).__init__()
 
         self.setFixedSize(MainWindow.window_width, MainWindow.window_height)
         # self.setMinimumSize(self.window_width, self.window_height)
         self.setMouseTracking(True)
 
-        self.working_field = QPixmap(MainWindow.window_width - 150, MainWindow.window_height)
+        self.working_field = QPixmap(MainWindow.window_width - 250, MainWindow.window_height)
         self.working_field.fill(Qt.white)
         self.mouse_coordinates = QPoint()
 
@@ -29,26 +29,62 @@ class MainWindow(QWidget):
 
         self.clear_button = QPushButton(self)
         self.clear_button.setText('Очистить')
-        self.clear_button.setGeometry(MainWindow.window_width - 140, MainWindow.window_height - 45, 80, 30)
+        self.clear_button.setGeometry(MainWindow.window_width - 240, MainWindow.window_height - 45, 80, 30)
         self.clear_button.clicked.connect(self.clear_working_field)
 
-        self.greedy_button = QPushButton(self)
-        self.greedy_button.setText('Жадный алгоритм')
-        self.greedy_button.setGeometry(MainWindow.window_width - 140, 15, 120, 30)
-        self.greedy_button.clicked.connect(self.calculate_greedy_algorithm)
+        self.button_greedy = QPushButton(self)
+        self.button_greedy.setText('Жадный алгоритм')
+        self.button_greedy.setGeometry(MainWindow.window_width - 240, 15, 120, 30)
+        self.button_greedy.clicked.connect(self.calculate_greedy_algorithm)
 
-        self.greedy_edit = QLineEdit(self)
-        self.greedy_edit.setGeometry(MainWindow.window_width - 140, 50, 100, 30)
-        self.greedy_edit.setEnabled(False)
+        self.line_edit_greedy_result = QLineEdit(self)
+        self.line_edit_greedy_result.setGeometry(MainWindow.window_width - 240, 50, 220, 30)
+        self.line_edit_greedy_result.setEnabled(False)
 
-        self.ant_button = QPushButton(self)
-        self.ant_button.setText('Роевой алгоритм')
-        self.ant_button.setGeometry(MainWindow.window_width - 140, 90, 120, 30)
-        self.ant_button.clicked.connect(self.calculate_ant_algorithm)
+        self.button_ant = QPushButton(self)
+        self.button_ant.setText('Роевой алгоритм')
+        self.button_ant.setGeometry(MainWindow.window_width - 240, 100, 120, 30)
+        self.button_ant.clicked.connect(self.calculate_ant_algorithm)
 
-        self.ant_edit = QLineEdit(self)
-        self.ant_edit.setGeometry(MainWindow.window_width - 140, 125, 100, 30)
-        self.ant_edit.setEnabled(False)
+        self.label_ant_iterations = QLabel(self)
+        self.label_ant_iterations.move(MainWindow.window_width - 240, 135)
+        self.label_ant_iterations.setText('Количество итераций:')
+        self.label_ant_iterations.adjustSize()
+
+        self.label_ant_distance_value = QLabel(self)
+        self.label_ant_distance_value.move(MainWindow.window_width - 240, 155)
+        self.label_ant_distance_value.setText('Степень влияния расстояния:')
+        self.label_ant_distance_value.adjustSize()
+
+        self.label_ant_pheromone_value = QLabel(self)
+        self.label_ant_pheromone_value.move(MainWindow.window_width - 240, 175)
+        self.label_ant_pheromone_value.setText('Степень влияния феромона:')
+        self.label_ant_pheromone_value.adjustSize()
+
+        self.label_ant_evaporation_coefficient = QLabel(self)
+        self.label_ant_evaporation_coefficient.move(MainWindow.window_width - 240, 195)
+        self.label_ant_evaporation_coefficient.setText('Коэффициент испарения:')
+        self.label_ant_evaporation_coefficient.adjustSize()
+
+        self.line_edit_ant_iterations = QLineEdit(self)
+        self.line_edit_ant_iterations.setGeometry(MainWindow.window_width - 50, 133, 30, 20)
+        self.line_edit_ant_iterations.setText('50')
+
+        self.line_edit_ant_distance_value = QLineEdit(self)
+        self.line_edit_ant_distance_value.setGeometry(MainWindow.window_width - 50, 153, 30, 20)
+        self.line_edit_ant_distance_value.setText('1')
+
+        self.line_edit_ant_pheromone_value = QLineEdit(self)
+        self.line_edit_ant_pheromone_value.setGeometry(MainWindow.window_width - 50, 173, 30, 20)
+        self.line_edit_ant_pheromone_value.setText('1')
+
+        self.line_edit_ant_evaporation_coefficient = QLineEdit(self)
+        self.line_edit_ant_evaporation_coefficient.setGeometry(MainWindow.window_width - 50, 193, 30, 20)
+        self.line_edit_ant_evaporation_coefficient.setText('0.2')
+
+        self.line_edit_ant_result = QLineEdit(self)
+        self.line_edit_ant_result.setGeometry(MainWindow.window_width - 240, 220, 220, 30)
+        self.line_edit_ant_result.setEnabled(False)
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
@@ -107,15 +143,15 @@ class MainWindow(QWidget):
         for point_number, point in Point.points_dict.items():
             self.draw_point(point.point_x, point.point_y, point_number)
         self.update()
-        self.greedy_edit.setText(str(total_way))
+        self.line_edit_greedy_result.setText(str(total_way))
 
     def calculate_ant_algorithm(self) -> None:
-        iterations = 10
-        evaporation_coefficient = 0.2
-        alpha, beta = 1, 1
-        ant_route_generator = functions.ant_algorithm(MainWindow.create_graph(), iterations, alpha, beta,
-                                                      evaporation_coefficient)
-        for step in ant_route_generator:
+        iterations = int(self.line_edit_ant_iterations.text())
+        alpha = int(self.line_edit_ant_distance_value.text())
+        beta = int(self.line_edit_ant_pheromone_value.text())
+        evaporation_coefficient = float(self.line_edit_ant_evaporation_coefficient.text())
+        for step in functions.ant_algorithm(MainWindow.create_graph(), iterations, alpha, beta,
+                                            evaporation_coefficient):
             self.working_field.fill(Qt.white)
             for start_point, values in step.items():
                 for i, destination_point in enumerate(values[0]):
@@ -124,7 +160,6 @@ class MainWindow(QWidget):
             self.painter.setPen(Qt.black)
             for point_number, point in Point.points_dict.items():
                 self.draw_point(point.point_x, point.point_y, point_number)
-            sleep(0.1)
             self.update()
 
     def draw_point(self, x, y, point_number):
