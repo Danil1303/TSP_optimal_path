@@ -34,26 +34,24 @@ def ant_algorithm(graph: dict[int, list[list[int], list[float]]], iterations: in
         values.append([0.1] * len(values[0]))
         Ant()
     for iteration in range(iterations):
-        total_distances = []
         # Запуск каждого муравья
         for ant in Ant.ants_list:
-            total_distance = 0
             while len(ant.route) != len(graph):
                 available_points = [point for point in graph[ant.route[-1]][0] if point not in ant.route]
                 indexes = [graph[ant.route[-1]][0].index(point) for point in available_points]
                 distances = [graph[ant.route[-1]][1][index] for index in indexes]
                 pheromones = [graph[ant.route[-1]][2][index] for index in indexes]
                 chosen_point_index = calculate_probabilities(distances, pheromones, alpha, beta)
-                total_distance += distances[chosen_point_index]
+                ant.total_distance += distances[chosen_point_index]
                 ant.route.append(available_points[chosen_point_index])
-            total_distances.append(total_distance)
-        # Испарение феромона на всех путях
+        # Испарение феромона на каждом пути
         for values in graph.values():
             for i in range(len(values[2])):
                 values[2][i] = values[2][i] * (1 - evaporation_coefficient)
         # Добавочный феромон от пробежавших муравьёв
         for i, ant in enumerate(Ant.ants_list):
-            additional_pheromone = 20 / total_distances[i]
+            additional_pheromone = 20 / ant.total_distance
+            ant.total_distance = 0
             for j in range(len(ant.route) - 1):
                 destination = graph[ant.route[j]][0].index(ant.route[j + 1])
                 graph[ant.route[j]][2][destination] += additional_pheromone

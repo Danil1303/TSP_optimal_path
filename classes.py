@@ -16,12 +16,13 @@ class Point:
 
 
 class Ant:
-    __slots__ = ['route']
+    __slots__ = ['route', 'total_distance']
     ants_list = []
 
     def __init__(self):
         self.route = [1]
         Ant.ants_list.append(self)
+        self.total_distance = 0
 
     @classmethod
     def delete_ants(cls):
