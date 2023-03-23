@@ -5,16 +5,15 @@ from time import sleep
 from classes import Point
 from PyQt5.QtCore import Qt, QPoint, QThread
 from PyQt5.QtGui import QPixmap, QPainter, QPen
-from PyQt5.QtWidgets import QApplication, QPushButton, QLabel, QLineEdit, QWidget
+from PyQt5.QtWidgets import QApplication, QPushButton, QLabel, QLineEdit, QMainWindow
 
 
-class MainWindow(QWidget):
+class MainWindow(QMainWindow):
     window_width = 1920
     window_height = 1000
 
     def __init__(self):
-        QWidget.__init__(self)
-        # super(MainWindow, self).__init__()
+        QMainWindow.__init__(self)
 
         self.setFixedSize(MainWindow.window_width, MainWindow.window_height)
         # self.setMinimumSize(self.window_width, self.window_height)
@@ -35,7 +34,7 @@ class MainWindow(QWidget):
         self.button_greedy = QPushButton(self)
         self.button_greedy.setText('Жадный алгоритм')
         self.button_greedy.setGeometry(MainWindow.window_width - 240, 15, 120, 30)
-        self.button_greedy.clicked.connect(self.calculate_greedy_algorithm)
+        self.button_greedy.clicked.connect(self.call_greedy_algorithm)
 
         self.line_edit_greedy_result = QLineEdit(self)
         self.line_edit_greedy_result.setGeometry(MainWindow.window_width - 240, 50, 220, 30)
@@ -44,7 +43,7 @@ class MainWindow(QWidget):
         self.button_ant = QPushButton(self)
         self.button_ant.setText('Роевой алгоритм')
         self.button_ant.setGeometry(MainWindow.window_width - 240, 100, 120, 30)
-        self.button_ant.clicked.connect(self.calculate_ant_algorithm)
+        self.button_ant.clicked.connect(self.call_ant_algorithm)
 
         self.label_ant_iterations = QLabel(self)
         self.label_ant_iterations.move(MainWindow.window_width - 240, 135)
@@ -91,29 +90,28 @@ class MainWindow(QWidget):
         painter.drawPixmap(QPoint(), self.working_field)
 
     def mousePressEvent(self, event) -> None:
-        mouse_coordinates = event.pos()
+        x_coordinate, y_coordinate = event.pos().x(), event.pos().y()
         if event.button() & Qt.LeftButton:
-            if MainWindow.check_borders(mouse_coordinates) and MainWindow.check_collisions(mouse_coordinates):
+            if MainWindow.check_borders(x_coordinate, y_coordinate) and MainWindow.check_collisions(x_coordinate,
+                                                                                                    y_coordinate):
                 self.painter.setPen(Qt.blue)
-                self.draw_point(mouse_coordinates.x(), mouse_coordinates.y(), point_number=Point.point_number)
-                Point(mouse_coordinates.x(), mouse_coordinates.y())
-
+                self.draw_point(x_coordinate, y_coordinate, point_number=Point.point_number)
+                Point(x_coordinate, y_coordinate)
                 self.update()
 
     @staticmethod
-    def check_borders(mouse_coordinates) -> bool:
-        if mouse_coordinates.x() > 15:
-            if mouse_coordinates.x() < MainWindow.window_width - 150 - 15:
-                if mouse_coordinates.y() > 15:
-                    if mouse_coordinates.y() < MainWindow.window_height - 15:
+    def check_borders(x_coordinate: int, y_coordinate: int) -> bool:
+        if x_coordinate > 15:
+            if x_coordinate < MainWindow.window_width - 150 - 15:
+                if y_coordinate > 15:
+                    if y_coordinate < MainWindow.window_height - 15:
                         return True
 
     @staticmethod
-    def check_collisions(mouse_coordinates) -> bool:
+    def check_collisions(x_coordinate: int, y_coordinate: int) -> bool:
         if Point.points_dict != 0:
             for point in Point.points_dict.values():
-                if math.sqrt((mouse_coordinates.x() - point.point_x) ** 2
-                             + (mouse_coordinates.y() - point.point_y) ** 2) < 100:
+                if math.sqrt((x_coordinate - point.point_x) ** 2 + (y_coordinate - point.point_y) ** 2) < 100:
                     return False
             return True
 
@@ -134,7 +132,7 @@ class MainWindow(QWidget):
                             point.point_y - destination_point.point_y) ** 2))
         return graph
 
-    def calculate_greedy_algorithm(self) -> None:
+    def call_greedy_algorithm(self) -> None:
         self.working_field.fill(Qt.white)
         total_way, order_list = functions.greedy(MainWindow.create_graph())
         self.painter.setPen(Qt.black)
@@ -145,88 +143,54 @@ class MainWindow(QWidget):
         self.update()
         self.line_edit_greedy_result.setText(str(total_way))
 
-    def calculate_ant_algorithm(self) -> None:
+    def call_ant_algorithm(self) -> None:
         iterations = int(self.line_edit_ant_iterations.text())
         alpha = int(self.line_edit_ant_distance_value.text())
         beta = int(self.line_edit_ant_pheromone_value.text())
         evaporation_coefficient = float(self.line_edit_ant_evaporation_coefficient.text())
-        for step in functions.ant_algorithm(MainWindow.create_graph(), iterations, alpha, beta,
-                                            evaporation_coefficient):
-            self.working_field.fill(Qt.white)
-            for start_point, values in step.items():
-                for i, destination_point in enumerate(values[0]):
-                    self.painter.setPen(QPen(Qt.red, 45 * values[2][i]))
-                    self.draw_path(start_point, destination_point)
-            self.painter.setPen(Qt.black)
-            for point_number, point in Point.points_dict.items():
-                self.draw_point(point.point_x, point.point_y, point_number)
-            self.update()
 
-    def draw_point(self, x, y, point_number):
-        self.painter.drawEllipse(x - 15, y - 15, 30, 30)
+        def draw_ant():
+            for step in functions.ant_algorithm(MainWindow.create_graph(), iterations, alpha, beta,
+                                                evaporation_coefficient):
+                self.working_field.fill(Qt.white)
+                for start_point, values in step.items():
+                    for i, destination_point in enumerate(values[0]):
+                        self.painter.setPen(QPen(Qt.gray, 45 * values[2][i]))
+                        self.draw_path(start_point, destination_point)
+                self.painter.setPen(Qt.black)
+                for point_number, point in Point.points_dict.items():
+                    self.draw_point(point.point_x, point.point_y, point_number)
+                self.update()
+                sleep(0.05)
+
+        self.thread_ant = ThreadAnt(draw_ant)
+        self.thread_ant.start()
+
+    def draw_point(self, x_coordinate: int, y_coordinate: int, point_number: int):
+        self.painter.drawEllipse(x_coordinate - 15, y_coordinate - 15, 30, 30)
         if point_number < 10:
-            self.painter.drawText(x - 3, y + 4, str(point_number))
+            self.painter.drawText(x_coordinate - 3, y_coordinate + 4, str(point_number))
         elif point_number < 100:
-            self.painter.drawText(x - 6, y + 4, str(point_number))
+            self.painter.drawText(x_coordinate - 6, y_coordinate + 4, str(point_number))
         else:
-            self.painter.drawText(x - 10, y + 4, str(point_number))
+            self.painter.drawText(x_coordinate - 10, y_coordinate + 4, str(point_number))
 
-    def draw_path(self, start_point, end_point) -> None:
+    def draw_path(self, start_point: int, end_point: int) -> None:
         start_x, start_y = Point.points_dict[start_point].point_x, Point.points_dict[start_point].point_y
         end_x, end_y = Point.points_dict[end_point].point_x, Point.points_dict[end_point].point_y
         self.painter.drawLine(start_x, start_y, end_x, end_y)
 
 
-# class ThreadServerConnection(QThread):
-#     def __init__(self, current_socket, label_server_status, plain_text_edit_status_report, connected_to_server_users):
-#         QThread.__init__(self)
-#         self.flag = True
-#         self.server_socket = current_socket
-#         self.label_server_status = label_server_status
-#         self.plain_text_edit_status_report = plain_text_edit_status_report
-#         self.connected_to_server_users = connected_to_server_users
-#         self.thread_inputs_list = []
-#
-#     def run(self) -> None:
-#         self.connection_update()
-#
-#     def connection_update(self):
-#         while self.flag:
-#             try:
-#                 client, address = self.server_socket.accept()
-#                 connected_user_name = client.recv(1024).decode('UTF-8')
-#                 self.connected_to_server_users.append([client, address, connected_user_name])
-#             except OSError:
-#                 pass
-#             else:
-#                 current_time = strftime('%H:%M:%S', localtime())
-#                 self.plain_text_edit_status_report.insertPlainText(f'{current_time} Connected {address} '
-#                                                                    f'as @{connected_user_name}\n')
-#                 thread_input = ThreadInput(self.connected_to_server_users[-1], 'server', self.connected_to_server_users,
-#                                            None, self.label_server_status, self.plain_text_edit_status_report,
-#                                            self.server_socket)
-#                 self.thread_inputs_list.append(thread_input)
-#                 thread_input.start()
-#                 self.label_server_status.setText(f'Статус:\n'
-#                                                  f'Сервер подключён\n'
-#                                                  f'Количество подключённых пользователей: '
-#                                                  f'{len(self.connected_to_server_users)}')
-#                 if len(self.connected_to_server_users) > 1:
-#                     for i in range(len(self.connected_to_server_users)):
-#                         connected_to_server_users_string = ''
-#                         for j, client in enumerate(self.connected_to_server_users):
-#                             if j != i:
-#                                 connected_to_server_users_string += f',{client[2]}'
-#                         self.connected_to_server_users[i][0].send(f'USERS_LIST'
-#                                                                   f'{connected_to_server_users_string}'.encode())
-#
-#     def stop(self):
-#         for input_thread in self.thread_inputs_list:
-#             input_thread.stop()
-#         self.thread_inputs_list = []
-#         for connection in self.connected_to_server_users:
-#             connection[0].close()
-#         self.flag = False
+class ThreadAnt(QThread):
+
+    def __init__(self, draw_ant: functions):
+        QThread.__init__(self)
+        self.threading_function = draw_ant
+        print(type(self.threading_function))
+
+    def run(self) -> None:
+        self.threading_function()
+
 
 def optimal_path():
     app = QApplication(sys.argv)
@@ -237,3 +201,5 @@ def optimal_path():
 
 if __name__ == '__main__':
     optimal_path()
+
+# pyinstaller -w -F --onefile --upx-dir=D:\UPX main.py
