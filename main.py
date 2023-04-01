@@ -3,6 +3,7 @@ import math
 import functions
 from time import sleep
 from classes import Point
+from copy import deepcopy
 from PyQt5.QtCore import Qt, QPoint, QThread
 from PyQt5.QtGui import QPixmap, QPainter, QPen
 from PyQt5.QtWidgets import QApplication, QPushButton, QLabel, QLineEdit, QMainWindow
@@ -65,6 +66,11 @@ class MainWindow(QMainWindow):
         self.label_ant_evaporation_coefficient.setText('Коэффициент испарения:')
         self.label_ant_evaporation_coefficient.adjustSize()
 
+        self.label_ant_pheromone_value = QLabel(self)
+        self.label_ant_pheromone_value.move(MainWindow.window_width - 240, 215)
+        self.label_ant_pheromone_value.setText('Запас феромона у муравья:')
+        self.label_ant_pheromone_value.adjustSize()
+
         self.line_edit_ant_iterations = QLineEdit(self)
         self.line_edit_ant_iterations.setGeometry(MainWindow.window_width - 50, 133, 30, 20)
         self.line_edit_ant_iterations.setText('50')
@@ -81,8 +87,12 @@ class MainWindow(QMainWindow):
         self.line_edit_ant_evaporation_coefficient.setGeometry(MainWindow.window_width - 50, 193, 30, 20)
         self.line_edit_ant_evaporation_coefficient.setText('0.2')
 
+        self.line_edit_ant_pheromone_value = QLineEdit(self)
+        self.line_edit_ant_pheromone_value.setGeometry(MainWindow.window_width - 50, 213, 30, 20)
+        self.line_edit_ant_pheromone_value.setText('20')
+
         self.line_edit_ant_result = QLineEdit(self)
-        self.line_edit_ant_result.setGeometry(MainWindow.window_width - 240, 220, 220, 30)
+        self.line_edit_ant_result.setGeometry(MainWindow.window_width - 240, 240, 220, 30)
         self.line_edit_ant_result.setEnabled(False)
 
     def paintEvent(self, event) -> None:
@@ -102,7 +112,7 @@ class MainWindow(QMainWindow):
     @staticmethod
     def check_borders(x_coordinate: int, y_coordinate: int) -> bool:
         if x_coordinate > 15:
-            if x_coordinate < MainWindow.window_width - 150 - 15:
+            if x_coordinate < MainWindow.window_width - 250 - 15:
                 if y_coordinate > 15:
                     if y_coordinate < MainWindow.window_height - 15:
                         return True
@@ -135,9 +145,11 @@ class MainWindow(QMainWindow):
     def call_greedy_algorithm(self) -> None:
         self.working_field.fill(Qt.white)
         total_way, order_list = functions.greedy(MainWindow.create_graph())
-        self.painter.setPen(Qt.black)
+
+        self.painter.setPen(QPen(Qt.black, 5))
         for i in range(len(order_list) - 1):
             self.draw_path(order_list[i], order_list[i + 1])
+        self.painter.setPen(Qt.black)
         for point_number, point in Point.points_dict.items():
             self.draw_point(point.point_x, point.point_y, point_number)
         self.update()
@@ -145,23 +157,33 @@ class MainWindow(QMainWindow):
 
     def call_ant_algorithm(self) -> None:
         iterations = int(self.line_edit_ant_iterations.text())
-        alpha = int(self.line_edit_ant_distance_value.text())
-        beta = int(self.line_edit_ant_pheromone_value.text())
-        evaporation_coefficient = float(self.line_edit_ant_evaporation_coefficient.text())
+        alpha = float(self.line_edit_ant_distance_value.text())
+        beta = float(self.line_edit_ant_pheromone_value.text())
+        evaporation_coefficient = 1 - float(self.line_edit_ant_evaporation_coefficient.text())
+        pheromone_value = float(self.line_edit_ant_pheromone_value.text())
 
         def draw_ant():
+            self.block_interface()
             for step in functions.ant_algorithm(MainWindow.create_graph(), iterations, alpha, beta,
-                                                evaporation_coefficient):
+                                                evaporation_coefficient, pheromone_value):
+                # Отрисовка всех путей
                 self.working_field.fill(Qt.white)
                 for start_point, values in step.items():
                     for i, destination_point in enumerate(values[0]):
-                        self.painter.setPen(QPen(Qt.gray, 45 * values[2][i]))
+                        self.painter.setPen(QPen(Qt.gray, self.calculate_line_thickness(values[2][i])))
                         self.draw_path(start_point, destination_point)
+                # Отрисовка оптимального пути на данной итерации
+                current_optimal_route = functions.ant_local_optimal_path(deepcopy(step))
+                for i in range(len(current_optimal_route[1]) - 1):
+                    self.painter.setPen(QPen(Qt.black, self.calculate_line_thickness(current_optimal_route[2][i]) + 1))
+                    self.draw_path(current_optimal_route[1][i], current_optimal_route[1][i + 1])
+                self.line_edit_ant_result.setText(str(current_optimal_route[0]))
                 self.painter.setPen(Qt.black)
                 for point_number, point in Point.points_dict.items():
                     self.draw_point(point.point_x, point.point_y, point_number)
                 self.update()
                 sleep(0.05)
+            self.unlock_interface()
 
         self.thread_ant = ThreadAnt(draw_ant)
         self.thread_ant.start()
@@ -180,13 +202,29 @@ class MainWindow(QMainWindow):
         end_x, end_y = Point.points_dict[end_point].point_x, Point.points_dict[end_point].point_y
         self.painter.drawLine(start_x, start_y, end_x, end_y)
 
+    @staticmethod
+    def calculate_line_thickness(weight: float) -> float:
+        line_thickness = weight * 30
+        if line_thickness > 21:
+            line_thickness = 21
+        return line_thickness
+
+    def block_interface(self) -> None:
+        self.button_greedy.setEnabled(False)
+        self.button_ant.setEnabled(False)
+        self.clear_button.setEnabled(False)
+
+    def unlock_interface(self) -> None:
+        self.button_greedy.setEnabled(True)
+        self.button_ant.setEnabled(True)
+        self.clear_button.setEnabled(True)
+
 
 class ThreadAnt(QThread):
 
     def __init__(self, draw_ant: functions):
         QThread.__init__(self)
         self.threading_function = draw_ant
-        print(type(self.threading_function))
 
     def run(self) -> None:
         self.threading_function()
